@@ -34,7 +34,7 @@
   /* 우측 상단: 미니맵 + 버튼 */
   #uiRight{position:fixed;top:8px;right:8px;z-index:12;width:260px;pointer-events:none}
   #minimap{
-    position:relative;width:100%;aspect-ratio:16/9;border-radius:8px;
+    position:relative;width:100%;aspect-ratio:10.28/12.75;border-radius:8px;
     background:url('TOP.png') center/cover no-repeat;
     box-shadow:0 2px 10px #0006;overflow:hidden;pointer-events:auto
   }
@@ -57,11 +57,11 @@
 <div id="uiRight">
   <div id="minimap">
     <!-- 핀 위치는 %로 조정 -->
-    <div class="mm-pin" style="left:20%;top:60%" data-scene="lobby"></div><div class="mm-label" style="left:20%;top:55%">로비</div>
-    <div class="mm-pin" style="left:45%;top:70%" data-scene="kitchen"></div><div class="mm-label" style="left:45%;top:65%">개수대</div>
-    <div class="mm-pin" style="left:45%;top:40%" data-scene="hall"></div><div class="mm-label" style="left:45%;top:35%">복도</div>
-    <div class="mm-pin" style="left:78%;top:40%" data-scene="classroom1"></div><div class="mm-label" style="left:78%;top:35%">교실 1</div>
-    <div class="mm-pin" style="left:85%;top:70%" data-scene="classroom2"></div><div class="mm-label" style="left:85%;top:65%">교실 2</div>
+    <div class="mm-pin" style="left:75%;top:55%" data-scene="lobby"></div><div class="mm-label" style="left:75%;top:52%">로비</div>
+    <div class="mm-pin" style="left:40%;top:80%" data-scene="kitchen"></div><div class="mm-label" style="left:40%;top:77%">개수대</div>
+    <div class="mm-pin" style="left:40%;top:55%" data-scene="hall"></div><div class="mm-label" style="left:40%;top:52%">복도</div>
+    <div class="mm-pin" style="left:35%;top:20%" data-scene="classroom1"></div><div class="mm-label" style="left:35%;top:17%">교실 1</div>
+    <div class="mm-pin" style="left:18%;top:68%" data-scene="classroom2"></div><div class="mm-label" style="left:18%;top:65%">교실 2</div>
   </div>
   <div id="controls">
     <button id="tourPlay">자동투어 시작</button>
@@ -72,11 +72,11 @@
 <script>
 /* ===== 공통 좌표(핫스팟/미니맵에서 동일 사용) ===== */
 const TARGET = {
-  lobby:{p:0,y:-180,f:120},
-  kitchen:{p:-7.14,y: -86.27,f:120},
-  hall:{p:-1.47,y:171.59,f:120},
+  lobby:{p:0,y:0,f:120},
+  kitchen:{p:0,y: 0,f:120},
+  hall:{p:0,y:180,f:120},
   classroom1:{p:-1.48,y: 177.48,f:120},
-  classroom2:{p:-11.24,y:-103.03,f:120},
+  classroom2:{p:0,y:0,f:120},
 };
 
 const FADE_MS=800, AUTO_ROT_SPEED_TOUR=7, AUTO_ROT_IDLE_MS=3000;
@@ -85,30 +85,28 @@ const FADE_MS=800, AUTO_ROT_SPEED_TOUR=7, AUTO_ROT_IDLE_MS=3000;
 const config={
   default:{firstScene:"lobby",sceneFadeDuration:FADE_MS,autoLoad:true},
   scenes:{
-    lobby:{type:"equirectangular",panorama:"VR-LOBBY.webp",pitch:0,yaw:-180,hfov:120,
+    lobby:{type:"equirectangular",panorama:"VR-LOBBY.webp",hfov:120,
       hotSpots:[
-        {pitch:-8.00,yaw:-177.83,cssClass:"hs",createTooltipFunc:el=>el.title="개수대",  clickHandlerFunc:()=>go("kitchen")},
-        {pitch:-5.22,yaw:161.54, cssClass:"hs",createTooltipFunc:el=>el.title="복도",clickHandlerFunc:()=>go("hall")}
+        {pitch:-5,yaw:-8,cssClass:"hs",createTooltipFunc:el=>el.title="교실 1",  clickHandlerFunc:()=>go("classroom1")},
+        {pitch:0,yaw:-90, cssClass:"hs",createTooltipFunc:el=>el.title="복도",clickHandlerFunc:()=>go("hall")}
       ]},
     kitchen:{type:"equirectangular",panorama:"VR-KITCHEN.webp",hfov:120,
       hotSpots:[
-        {pitch:0.00,yaw:0.00,   cssClass:"hs",createTooltipFunc:el=>el.title="로비",  clickHandlerFunc:()=>go("lobby")},
-        {pitch:-5.85,yaw:90.12, cssClass:"hs",createTooltipFunc:el=>el.title="복도",clickHandlerFunc:()=>go("hall")}
+        {pitch:0,yaw:0, cssClass:"hs",createTooltipFunc:el=>el.title="복도",clickHandlerFunc:()=>go("hall")}
       ]},
     hall:{type:"equirectangular",panorama:"VR-HALL.webp",hfov:120,
       hotSpots:[
-        {pitch:-7.84,yaw:90.00, cssClass:"hs",createTooltipFunc:el=>el.title="개수대",  clickHandlerFunc:()=>go("kitchen")},
-        {pitch:-3.10,yaw:165.87,cssClass:"hs",createTooltipFunc:el=>el.title="로비",  clickHandlerFunc:()=>go("lobby")},
-        {pitch:-5.95,yaw:0.64,  cssClass:"hs",createTooltipFunc:el=>el.title="교실 1",clickHandlerFunc:()=>go("classroom1")}
+        {pitch:-0,yaw:180.00, cssClass:"hs",createTooltipFunc:el=>el.title="개수대",  clickHandlerFunc:()=>go("kitchen")},
+        {pitch:-0,yaw:90,cssClass:"hs",createTooltipFunc:el=>el.title="로비",  clickHandlerFunc:()=>go("lobby")},
+        {pitch:-15,yaw:-25,  cssClass:"hs",createTooltipFunc:el=>el.title="교실 2",clickHandlerFunc:()=>go("classroom2")}
       ]},
     classroom1:{type:"equirectangular",panorama:"VR-CLASSROOM-1.webp",hfov:120,
       hotSpots:[
-        {pitch:-1.48,yaw:177.48,cssClass:"hs",createTooltipFunc:el=>el.title="복도",clickHandlerFunc:()=>go("hall")},
-        {pitch:-6.60,yaw:85.96, cssClass:"hs",createTooltipFunc:el=>el.title="교실 2",  clickHandlerFunc:()=>go("classroom2")},
+        {pitch:-5,yaw:115,cssClass:"hs",createTooltipFunc:el=>el.title="로비",clickHandlerFunc:()=>go("lobby")},
       ]},
     classroom2:{type:"equirectangular",panorama:"VR-CLASSROOM-2.webp",hfov:120,
       hotSpots:[
-        {pitch:-4.56,yaw:-120.10,cssClass:"hs",createTooltipFunc:el=>el.title="교실 1",clickHandlerFunc:()=>go("classroom1")},
+        {pitch:-5.5,yaw:29,cssClass:"hs",createTooltipFunc:el=>el.title="복도",clickHandlerFunc:()=>go("hall")},
       ]},
     
   }
