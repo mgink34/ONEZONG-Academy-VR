@@ -1,0 +1,237 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.css">
+<script src="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.js"></script>
+<style>
+  body{margin:0}
+  #p{width:100vw;height:100vh}
+  .hs{width:22px;height:22px;border-radius:50%;background:#fff8;border:2px solid #0007;box-shadow:0 0 6px #0006;cursor:pointer}
+  #coord{position:fixed;left:8px;bottom:8px;padding:6px 8px;background:#000a;color:#fff;font:12px/1.2 monospace;border-radius:4px;z-index:11}
+  #sceneLabel{position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:14;padding:6px 10px;border-radius:6px;background:#0009;color:#fff;font:30px/1.2 sans-serif}
+  #rotateHint{position:fixed;top:72px;left:50%;transform:translateX(-50%);z-index:15;padding:4px 8px;border-radius:6px;background:rgba(255,255,255,.8);color:#f00;font:18px/1.2 sans-serif}
+  /* 투어 중 미니맵 숨김 */
+  #minimap.tour-hide{ opacity:0; pointer-events:none; transition:opacity .2s; }
+
+  /* 투어 중 버튼 위치 재배치: 우상단 고정 */
+  #controls.tour-pos{
+    position: fixed;
+    right: 8px;
+    top: 8px;
+    z-index: 16;
+    gap: 10px;
+  }
+  #controls.tour-pos button{ padding:10px 14px }
+  #coord.tour-hide{ opacity:0; pointer-events:none; transition:opacity .2s; }
+
+
+
+
+  @media (orientation:landscape){ #rotateHint{display:none} }
+
+  /* 우측 상단: 미니맵 + 버튼 */
+  #uiRight{position:fixed;top:8px;right:8px;z-index:12;width:260px;pointer-events:none}
+  #minimap{
+    position:relative;width:100%;aspect-ratio:16/9;border-radius:8px;
+    background:url('TOP.png') center/cover no-repeat;
+    box-shadow:0 2px 10px #0006;overflow:hidden;pointer-events:auto
+  }
+  .mm-pin{position:absolute;transform:translate(-50%,-50%);width:18px;height:18px;border-radius:50%;background:#ff0c;border:2px solid #0008;box-shadow:0 0 6px #0007;cursor:pointer}
+  .mm-pin:hover{background:#ff0e}
+  .mm-label{position:absolute;transform:translate(-50%,-125%);color:#fff;background:#0009;font:12px/1.1 sans-serif;padding:2px 6px;border-radius:4px;pointer-events:none}
+  #controls{margin-top:8px;display:flex;gap:8px;justify-content:flex-end;pointer-events:auto}
+  #controls button{padding:8px 10px;border:1px solid #0003;border-radius:6px;cursor:pointer;background:#fff9}
+  #tourPlay,#tourPause{position:static}
+  @media (max-width:480px){ #uiRight{width:180px} }
+</style>
+</head>
+<body>
+<div id="p"></div>
+<div id="sceneLabel">-</div>
+<div id="rotateHint">화면을 가로로 돌려주세요!!</div>
+<div id="coord">pitch:-, yaw:-, hfov:-</div>
+
+<!-- 우측 상단 UI -->
+<div id="uiRight">
+  <div id="minimap">
+    <!-- 핀 위치는 %로 조정 -->
+    <div class="mm-pin" style="left:20%;top:60%" data-scene="lobby"></div><div class="mm-label" style="left:20%;top:55%">로비</div>
+    <div class="mm-pin" style="left:45%;top:70%" data-scene="kitchen"></div><div class="mm-label" style="left:45%;top:65%">개수대</div>
+    <div class="mm-pin" style="left:45%;top:40%" data-scene="hall"></div><div class="mm-label" style="left:45%;top:35%">복도</div>
+    <div class="mm-pin" style="left:78%;top:40%" data-scene="classroom1"></div><div class="mm-label" style="left:78%;top:35%">교실 1</div>
+    <div class="mm-pin" style="left:85%;top:70%" data-scene="classroom2"></div><div class="mm-label" style="left:85%;top:65%">교실 2</div>
+  </div>
+  <div id="controls">
+    <button id="tourPlay">자동투어 시작</button>
+    <button id="tourPause">자동투어 정지</button>
+  </div>
+</div>
+
+<script>
+/* ===== 공통 좌표(핫스팟/미니맵에서 동일 사용) ===== */
+const TARGET = {
+  lobby:{p:0,y:-180,f:120},
+  kitchen:{p:-7.14,y: -86.27,f:120},
+  hall:{p:-1.47,y:171.59,f:120},
+  classroom1:{p:-1.48,y: 177.48,f:120},
+  classroom2:{p:-11.24,y:-103.03,f:120},
+};
+
+const FADE_MS=800, AUTO_ROT_SPEED_TOUR=7, AUTO_ROT_IDLE_MS=3000;
+
+/* ===== 씬 설정(핫스팟도 TARGET 재사용) ===== */
+const config={
+  default:{firstScene:"lobby",sceneFadeDuration:FADE_MS,autoLoad:true},
+  scenes:{
+    lobby:{type:"equirectangular",panorama:"VR-LOBBY.webp",pitch:0,yaw:-180,hfov:120,
+      hotSpots:[
+        {pitch:-8.00,yaw:-177.83,cssClass:"hs",createTooltipFunc:el=>el.title="개수대",  clickHandlerFunc:()=>go("kitchen")},
+        {pitch:-5.22,yaw:161.54, cssClass:"hs",createTooltipFunc:el=>el.title="복도",clickHandlerFunc:()=>go("hall")}
+      ]},
+    kitchen:{type:"equirectangular",panorama:"VR-KITCHEN.webp",hfov:120,
+      hotSpots:[
+        {pitch:0.00,yaw:0.00,   cssClass:"hs",createTooltipFunc:el=>el.title="로비",  clickHandlerFunc:()=>go("lobby")},
+        {pitch:-5.85,yaw:90.12, cssClass:"hs",createTooltipFunc:el=>el.title="복도",clickHandlerFunc:()=>go("hall")}
+      ]},
+    hall:{type:"equirectangular",panorama:"VR-HALL.webp",hfov:120,
+      hotSpots:[
+        {pitch:-7.84,yaw:90.00, cssClass:"hs",createTooltipFunc:el=>el.title="개수대",  clickHandlerFunc:()=>go("kitchen")},
+        {pitch:-3.10,yaw:165.87,cssClass:"hs",createTooltipFunc:el=>el.title="로비",  clickHandlerFunc:()=>go("lobby")},
+        {pitch:-5.95,yaw:0.64,  cssClass:"hs",createTooltipFunc:el=>el.title="교실 1",clickHandlerFunc:()=>go("classroom1")}
+      ]},
+    classroom1:{type:"equirectangular",panorama:"VR-CLASSROOM-1.webp",hfov:120,
+      hotSpots:[
+        {pitch:-1.48,yaw:177.48,cssClass:"hs",createTooltipFunc:el=>el.title="복도",clickHandlerFunc:()=>go("hall")},
+        {pitch:-6.60,yaw:85.96, cssClass:"hs",createTooltipFunc:el=>el.title="교실 2",  clickHandlerFunc:()=>go("classroom2")},
+      ]},
+    classroom2:{type:"equirectangular",panorama:"VR-CLASSROOM-2.webp",hfov:120,
+      hotSpots:[
+        {pitch:-4.56,yaw:-120.10,cssClass:"hs",createTooltipFunc:el=>el.title="교실 1",clickHandlerFunc:()=>go("classroom1")},
+      ]},
+    
+  }
+};
+
+const viewer=pannellum.viewer('p',config);
+
+  // ↓ 여기부터 가로 고정 코드 붙이기
+  const isAndroidChrome = /Android/i.test(navigator.userAgent) && !!window.chrome;
+  const canLock = 'orientation' in screen && 'lock' in screen.orientation;
+  async function tryLockLandscape(){ if(!isAndroidChrome||!canLock) return; try{ await screen.orientation.lock('landscape'); }catch{} }
+  function tryUnlock(){ try{ screen.orientation.unlock?.(); }catch{} }
+  function isFS(){ return document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement; }
+  function onFSChange(){ if (isFS()) tryLockLandscape(); else tryUnlock(); }
+  document.addEventListener('fullscreenchange', onFSChange);
+  document.addEventListener('webkitfullscreenchange', onFSChange);
+  function enterFS(el){
+  return el.requestFullscreen?.() || el.webkitRequestFullscreen?.() || el.msRequestFullscreen?.();
+}
+  function exitFS(){
+  return document.exitFullscreen?.() || document.webkitExitFullscreen?.() || document.msExitFullscreen?.();
+}
+// 헬퍼
+  function setMiniMapHidden(hide){
+    document.getElementById('minimap').classList.toggle('tour-hide', hide);
+}
+
+function setTourUI(on){
+  document.getElementById('minimap').classList.toggle('tour-hide', on);
+  document.getElementById('controls').classList.toggle('tour-pos', on);
+  document.getElementById('coord').classList.toggle('tour-hide', on); // ← 좌표 HUD 숨김
+}
+
+
+
+
+
+/* ===== 공통 전환 ===== */
+let transitioning=false;
+function flyAndLoad(id,p,y,f){
+  if(transitioning) return;
+  transitioning=true;
+  viewer.loadScene(id,p,y,f,FADE_MS);
+  setTimeout(()=>{transitioning=false},FADE_MS+50);
+}
+function go(id){
+  const t=TARGET[id]||{p:0,y:0,f:120};
+  flyAndLoad(id,t.p,t.y,t.f);
+}
+
+/* ===== 미니맵 클릭 → 동일 좌표로 이동 ===== */
+document.querySelectorAll('.mm-pin').forEach(el=>{
+  el.addEventListener('click',()=> go(el.dataset.scene));
+});
+
+/* ===== 오토투어 ===== */
+const tourSteps=[
+  {scene:'lobby',...TARGET.lobby,dwell:32000},
+  {scene:'kitchen',...TARGET.kitchen,dwell:32000},
+  {scene:'hall',...TARGET.hall,dwell:32000},
+  {scene:'classroom1',...TARGET.classroom1,dwell:32000},
+  {scene:'classroom2',...TARGET.classroom2,dwell:32000},
+];
+let tourIdx=0,tourTimer=null,touring=false,idleTimer=null;
+function gotoStep(i){
+  const s=tourSteps[i%tourSteps.length];
+  const onLoad=()=>{
+    viewer.off('load',onLoad);
+    if(!touring){ try{viewer.stopAutoRotate();}catch{}; return; }
+    try{viewer.startAutoRotate(AUTO_ROT_SPEED_TOUR);}catch{}
+    updateSceneLabel();
+  };
+  viewer.on('load',onLoad); viewer.loadScene(s.scene,s.p,s.y,s.f,FADE_MS);
+}
+function nextStep(){ if(!touring) return; tourIdx=(tourIdx+1)%tourSteps.length; gotoStep(tourIdx); clearTimeout(tourTimer); tourTimer=setTimeout(nextStep,tourSteps[tourIdx].dwell+FADE_MS); }
+
+// 자동투어 시작
+document.getElementById('tourPlay').onclick = async ()=>{
+  if (touring) return;
+  if (!isFS()) { try{ await enterFS(document.documentElement); }catch(e){} }
+  touring = true;
+  setTourUI(true);                 // ← 미니맵 숨김 + 버튼 이동
+  gotoStep(tourIdx);
+  clearTimeout(tourTimer);
+  tourTimer = setTimeout(nextStep, tourSteps[tourIdx].dwell + FADE_MS);
+};
+
+// 자동투어 정지
+document.getElementById('tourPause').onclick = async ()=>{
+  touring = false;
+  clearTimeout(tourTimer);
+  try{ viewer.stopAutoRotate(); }catch{}
+  setTourUI(false);                // ← 미니맵 복원 + 버튼 원위치
+  try{ await exitFS(); }catch{}
+  try{ screen.orientation.unlock?.(); }catch{}
+};
+
+// FS 종료 시 안전 복원
+['fullscreenchange','webkitfullscreenchange'].forEach(ev=>{
+  document.addEventListener(ev, ()=>{ if(!isFS()) setTourUI(false); });
+});
+
+
+
+
+/* 사용자 조작 시 회전 일시 정지 후 재개 */
+['mousedown','touchstart','wheel','keydown'].forEach(ev=>{
+  window.addEventListener(ev,()=>{ if(!touring) return; try{viewer.stopAutoRotate()}catch{}; clearTimeout(idleTimer); idleTimer=setTimeout(()=>{ if(touring){try{viewer.startAutoRotate(AUTO_ROT_SPEED_TOUR)}catch{}} },AUTO_ROT_IDLE_MS);},{passive:true});
+});
+
+/* ===== 기타 ===== */
+function resume(){ setTimeout(()=>{ if(touring){try{viewer.startAutoRotate(AUTO_ROT_SPEED_TOUR)}catch{}} updateSceneLabel(); },80); }
+['fullscreenchange','webkitfullscreenchange','msfullscreenchange'].forEach(ev=>document.addEventListener(ev,resume));
+window.addEventListener('resize',resume); window.addEventListener('orientationchange',resume);
+
+const sceneNames={lobby:'로비',kitchen:'개수대',hall:'복도',classroom1:'교실 1',classroom2:'교실 2'};
+function updateSceneLabel(){ const id=viewer.getScene(); document.getElementById('sceneLabel').textContent=sceneNames[id]||id||'-'; }
+viewer.on('load',updateSceneLabel); updateSceneLabel();
+
+function updateHUD(){ const a=viewer.getPitch().toFixed(2),b=viewer.getYaw().toFixed(2),c=viewer.getHfov().toFixed(2); document.getElementById('coord').textContent=`pitch:${a}, yaw:${b}, hfov:${c}`; }
+['mouseup','touchend','wheel','keydown'].forEach(ev=>window.addEventListener(ev,updateHUD));
+
+
+</script>
+</body>
+</html>
