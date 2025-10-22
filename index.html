@@ -5,32 +5,13 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
 <title>WebXR 파노라마 투어</title>
 
-<!-- A-Frame + look-at -->
 <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
 <script src="https://unpkg.com/aframe-look-at-component@1.0.0/dist/aframe-look-at-component.min.js"></script>
 
 <style>
-  /* html과 body의 기본 스타일 */
-  html, body {
-    margin: 0;
-    height: 100%;
-    background: #000;
-  }
-
-  /* body를 flexbox 컨테이너로 만들어 a-scene을 중앙 정렬 */
-  body {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-  }
-
-  /* a-scene의 비율을 16:9로 고정 */
-  a-scene {
-    width: auto;
-    height: 100vh;
-    max-width: 100vw;
-    aspect-ratio: 16 / 9;
-  }
+  html,body{margin:0;height:100%;background:#000}
+  body{display:flex;justify-content:center;align-items:center}
+  a-scene{width:auto;height:100vh;max-width:100vw;aspect-ratio:16/9}
   #sceneLabel{position:fixed;top:8px;left:8px;z-index:10;padding:6px 10px;background:#0009;color:#fff;border-radius:6px;font:16px/1.2 sans-serif;pointer-events:none}
   #coord{position:fixed;left:8px;bottom:8px;z-index:10;padding:6px 10px;background:#0009;color:#fff;border-radius:6px;font:12px/1.2 monospace;pointer-events:none}
   #controls{position:fixed;top:8px;right:8px;z-index:11;display:flex;gap:8px}
@@ -52,8 +33,7 @@
 <div id="uiRight"><div id="minimap"></div></div>
 
 <a-scene id="scene" renderer="antialias:true; colorManagement:true" vr-mode-ui="enabled:true">
-  <a-entity id="rig" position="0 1.6 0" look-controls wasd-controls>
-    <!-- 리티클 제거, 레이캐스터 강화 -->
+  <a-entity id="rig" position="0 1.6 0" look-controls>
     <a-entity id="cam"
       camera="fov:80"
       cursor="rayOrigin: mouse"
@@ -69,10 +49,10 @@
 (async function(){
   const cfg = await fetch('tour.config.json',{cache:'no-cache'}).then(r=>r.json());
 
-  // ---- 가시성/좌표 보정 파라미터(필요시 JSON으로 덮어씀) ----
-  const YAW_MODE     = cfg.constants?.YAW_MODE     || "NEG";  // "NEG" 또는 "NEG_180"
-  const HS_RADIUS    = cfg.constants?.HS_RADIUS    ?? 6;      // 핫스팟 크기(월드 단위)
-  const HS_SPHERE_R  = cfg.constants?.HS_SPHERE_R  ?? 480;    // 핫스팟 배치 반경(스카이=500)
+  // 파라미터(부호 유지)
+  const YAW_MODE     = cfg.constants?.YAW_MODE     || "NEG";   // "NEG" 또는 "NEG_180"
+  const HS_RADIUS    = cfg.constants?.HS_RADIUS    ?? 6;       // 핫스팟 크기
+  const HS_SPHERE_R  = cfg.constants?.HS_SPHERE_R  ?? 480;     // 배치 반경
 
   const TARGET = cfg.targets || {};
   const sceneNames = cfg.sceneNames || {};
@@ -92,26 +72,15 @@
   function setCoord(){
     const rot = rig.getAttribute('rotation');
     const fov = cam.getAttribute('camera').fov;
-  
-    // --- Yaw 각도 정규화 로직 시작 ---
-    // 1. 현재 누적된 yaw 값을 가져옵니다.
-    let yaw = -rot.y;
-  
-    // 2. 360으로 나눈 나머지 값을 구해 -359 ~ 359 범위로 만듭니다.
-    yaw = yaw % 360;
-  
-    // 3. 180도보다 크면 360을 빼서 반대쪽의 짧은 음수 각도로 변환합니다. (예: 270도 -> -90도)
-    if (yaw > 180) {
-      yaw -= 360;
-    }
-  
-    // 4. -180도보다 작으면 360을 더해서 반대쪽의 짧은 양수 각도로 변환합니다. (예: -270도 -> 90도)
-    if (yaw < -180) {
-      yaw += 360;
-    }
-    // --- Yaw 각도 정규화 로직 끝 ---
 
-    document.getElementById('coord').textContent = `pitch:${(rot.x).toFixed(1)}, yaw:${yaw.toFixed(1)}, fov:${fov.toFixed(1)}`;
+    // yaw 정규화(부호는 현재 방식 유지)
+    let yaw = -rot.y;
+    yaw = yaw % 360;
+    if (yaw > 180) yaw -= 360;
+    if (yaw < -180) yaw += 360;
+
+    document.getElementById('coord').textContent =
+      `pitch:${(rot.x).toFixed(1)}, yaw:${yaw.toFixed(1)}, fov:${fov.toFixed(1)}`;
   }
   setInterval(setCoord, 250);
 
@@ -128,7 +97,7 @@
     }
   })();
 
-  // 좌표 변환: Pannellum → A-Frame
+  // 좌표 변환(부호 유지)
   function yawConv(y){ return (YAW_MODE==="NEG") ? y : (180 - y); }
   function hotspotPos(pitchDeg, yawDeg, R=HS_SPHERE_R){
     const t=Math.PI/180, p=pitchDeg*t, y=yawConv(yawDeg)*t;
@@ -142,22 +111,25 @@
     e.className='hs';
     e.setAttribute('geometry', `primitive: circle; radius: ${HS_RADIUS}`);
     e.setAttribute('material','shader:flat; color:#ffda00; opacity:0.98; transparent:true; side:double; emissive:#ffda00; emissiveIntensity:1.0; depthTest:false');
-    e.object3D.renderOrder = 999;                       // 항상 위에
+    e.object3D.renderOrder = 999;
     e.setAttribute('position', hotspotPos(h.pitch, h.yaw));
     e.setAttribute('look-at','#cam');
 
     const goNow = ()=> go(h.to);
     e.addEventListener('click', goNow);
+    e.addEventListener('touchstart', goNow, {passive:true});
     return e;
   }
 
+  // HFOV→VFOV(캔버스 null 가드)
   function setFovFromHFOV(hfov){
-    // sceneEl.canvas는 A-Frame 씬의 캔버스 요소입니다.
     const sceneEl = document.querySelector('a-scene');
-    const aspect = sceneEl.canvas.clientWidth / sceneEl.canvas.clientHeight;
-    const hf=(hfov??100)*Math.PI/180;
-    const vf=2*Math.atan(Math.tan(hf/2)/aspect)*180/Math.PI;
-    cam.setAttribute('camera','fov',Math.max(40,Math.min(110,vf)));
+    const cw = sceneEl.canvas?.clientWidth || window.innerWidth;
+    const ch = sceneEl.canvas?.clientHeight || window.innerHeight;
+    const aspect = cw / ch;
+    const hf=(hfov??100)*Math.PI/180;
+    const vf=2*Math.atan(Math.tan(hf/2)/aspect)*180/Math.PI;
+    cam.setAttribute('camera','fov', Math.max(40, Math.min(110, vf)));
   }
 
   AFRAME.registerComponent('fade-sky',{
@@ -179,7 +151,12 @@
     setTimeout(()=>{
       sky.setAttribute('src', cfg.assets.panoramas[id]);
       setFovFromHFOV(f || scenes[id].hfov);
+
+      // 회전 적용 + look-controls 갱신
       rig.setAttribute('rotation', `${-p} ${-y} 0`);
+      rig.setAttribute('look-controls','enabled', false);
+      rig.setAttribute('look-controls','enabled', true);
+
       clearHotspots();
       (scenes[id].hotSpots||[]).forEach(h=> hsRoot.appendChild(makeHotspot(h)));
       setLabel(id); setCoord();
@@ -209,6 +186,17 @@
   }
   document.getElementById('tourPlay').onclick=()=>{ if(touring) return; touring=true; tourStep(tourIdx); };
   document.getElementById('tourPause').onclick=()=>{ touring=false; clearTimeout(tourTimer); stopAutoRot(); };
+
+  // 유휴 자동 회전
+  function startAutoRot(){
+    rig.setAttribute('animation__yaw',
+      `property: rotation; to: 0 -360 0; loop: true; dur:${360/Math.max(1,AUTO_ROT_SPEED_TOUR)*1000}; easing: linear`);
+  }
+  function stopAutoRot(){ rig.removeAttribute('animation__yaw'); }
+  ['mousedown','touchstart','wheel','keydown'].forEach(ev=>{
+    window.addEventListener(ev,()=>{ stopAutoRot(); clearTimeout(idleTimer);
+      idleTimer=setTimeout(()=>{ if(!touring) startAutoRot(); }, AUTO_ROT_IDLE_MS); },{passive:true});
+  });
 
   // 확대/축소(일반 화면·모바일 전용)
   const FOV_MIN=35, FOV_MAX=110, FOV_STEP=3;
