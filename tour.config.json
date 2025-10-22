@@ -3,11 +3,19 @@
     "FADE_MS": 800,
     "AUTO_ROT_SPEED_TOUR": 7,
     "YAW_MODE": "NEG",
-    "HS_HIT_R": 22,              
-    "HS_VIS_R": 10,                
-    "HS_SPHERE_R": 480,          
-    "TARGET_PITCH_SIGN": -1,      
-    "TARGET_YAW_SIGN": -1           
+    "HS_HIT_R": 22,
+    "HS_VIS_R": 10,
+    "HS_SPHERE_R": 480,
+    "TARGET_PITCH_SIGN": -1,
+    "TARGET_YAW_SIGN": -1
+  },
+  "hud": {
+    "label3D": {
+      "position": [-0.65, 0.40, -0.70],
+      "plane": { "width": 0.3, "height": 0.07, "opacity": 0.70 },
+      "text":  { "fontSize": 0.06, "maxWidth": 1.05, "color": "#ffffff",
+                 "font": "fonts/NotoSansKR-Regular.ttf" }
+    }
   },
   "assets": {
     "minimap": "TOP.png",
@@ -27,11 +35,11 @@
     "classroom2": "교실 2"
   },
   "targets": {
-    "lobby":      { "p": 0,    "y": 0,      "f": 110 },
-    "kitchen":    { "p": 0,    "y": 90,      "f": 110 },
-    "hall":       { "p": 0,    "y": -90,    "f": 110 },
-    "classroom1": { "p": -10,    "y": -22, "f": 110   },
-    "classroom2": { "p": 0,    "y": 90,      "f": 110 }
+    "lobby":      { "p": 0,   "y": 0,    "f": 110 },
+    "kitchen":    { "p": 0,   "y": 90,   "f": 110 },
+    "hall":       { "p": 0,   "y": -90,  "f": 110 },
+    "classroom1": { "p": -10, "y": -22,  "f": 110 },
+    "classroom2": { "p": 0,   "y": 90,   "f": 110 }
   },
   "scenes": [
     {
@@ -39,7 +47,7 @@
       "hfov": 110,
       "hotSpots": [
         { "pitch": -7,  "yaw": -96,  "label": "교실 1", "to": "classroom1" },
-        { "pitch": -5,   "yaw": 180, "label": "복도",   "to": "hall" }
+        { "pitch": -5,  "yaw": 180,  "label": "복도",   "to": "hall" }
       ]
     },
     {
@@ -53,9 +61,9 @@
       "id": "hall",
       "hfov": 120,
       "hotSpots": [
-        { "pitch": -5,  "yaw": 90, "label": "개수대", "to": "kitchen" },
-        { "pitch": -5,  "yaw": 0,  "label": "로비",   "to": "lobby" },
-        { "pitch": -15,"yaw": -113, "label": "교실 2", "to": "classroom2" }
+        { "pitch": -5,  "yaw": 90,  "label": "개수대", "to": "kitchen" },
+        { "pitch": -5,  "yaw": 0,   "label": "로비",   "to": "lobby" },
+        { "pitch": -15, "yaw": -113,"label": "교실 2", "to": "classroom2" }
       ]
     },
     {
@@ -76,7 +84,7 @@
   "tour": {
     "order": ["lobby", "kitchen", "hall", "classroom1", "classroom2"],
     "dwellMs": 32000,
-    "perSceneDwell": { }
+    "perSceneDwell": {}
   },
   "minimapPins": [
     { "left": "75%", "top": "55%", "scene": "lobby",      "label": "로비" },
