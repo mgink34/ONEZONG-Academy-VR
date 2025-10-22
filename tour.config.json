@@ -2,7 +2,10 @@
   "constants": {
     "FADE_MS": 800,
     "AUTO_ROT_SPEED_TOUR": 7,
-    "AUTO_ROT_IDLE_MS": 3000
+    "AUTO_ROT_IDLE_MS": 3000,
+    "YAW_MODE": "NEG",
+    "HS_RADIUS": 10,
+    "HS_SPHERE_R": 480
   },
   "assets": {
     "minimap": "TOP.png",
@@ -22,49 +25,49 @@
     "classroom2": "교실 2"
   },
   "targets": {
-    "lobby":      { "p": 0,    "y": 0,      "f": 120 },
-    "kitchen":    { "p": 0,    "y": 0,      "f": 120 },
-    "hall":       { "p": 0,    "y": 180,    "f": 120 },
-    "classroom1": { "p": -1.48,"y": 177.48, "f": 120 },
-    "classroom2": { "p": 0,    "y": 0,      "f": 120 }
+    "lobby":      { "p": 0,    "y": 0,      "f": 110 },
+    "kitchen":    { "p": 0,    "y": 0,      "f": 110 },
+    "hall":       { "p": 0,    "y": 180,    "f": 110 },
+    "classroom1": { "p": -1.48,"y": 177.48, "f": 110 },
+    "classroom2": { "p": 0,    "y": 0,      "f": 110 }
   },
   "scenes": [
     {
       "id": "lobby",
-      "hfov": 120,
+      "hfov": 110,
       "hotSpots": [
-        { "pitch": -5,  "yaw": -8,  "label": "교실 1", "to": "classroom1" },
-        { "pitch": 0,   "yaw": -90, "label": "복도",   "to": "hall" }
+        { "pitch": -7,  "yaw": -96,  "label": "교실 1", "to": "classroom1" },
+        { "pitch": -5,   "yaw": 180, "label": "복도",   "to": "hall" }
       ]
     },
     {
       "id": "kitchen",
       "hfov": 120,
       "hotSpots": [
-        { "pitch": 0, "yaw": 0, "label": "복도", "to": "hall" }
+        { "pitch": -5, "yaw": -90, "label": "복도", "to": "hall" }
       ]
     },
     {
       "id": "hall",
       "hfov": 120,
       "hotSpots": [
-        { "pitch": 0,  "yaw": 180, "label": "개수대", "to": "kitchen" },
-        { "pitch": 0,  "yaw": 90,  "label": "로비",   "to": "lobby" },
-        { "pitch": -15,"yaw": -25, "label": "교실 2", "to": "classroom2" }
+        { "pitch": -5,  "yaw": 90, "label": "개수대", "to": "kitchen" },
+        { "pitch": -5,  "yaw": 0,  "label": "로비",   "to": "lobby" },
+        { "pitch": -15,"yaw": -113, "label": "교실 2", "to": "classroom2" }
       ]
     },
     {
       "id": "classroom1",
       "hfov": 120,
       "hotSpots": [
-        { "pitch": -5, "yaw": 115, "label": "로비", "to": "lobby" }
+        { "pitch": -5, "yaw": 23, "label": "로비", "to": "lobby" }
       ]
     },
     {
       "id": "classroom2",
       "hfov": 120,
       "hotSpots": [
-        { "pitch": -5.5, "yaw": 29, "label": "복도", "to": "hall" }
+        { "pitch": -5.5, "yaw": -62, "label": "복도", "to": "hall" }
       ]
     }
   ],
@@ -80,7 +83,5 @@
     { "left": "35%", "top": "20%", "scene": "classroom1", "label": "교실 1" },
     { "left": "18%", "top": "68%", "scene": "classroom2", "label": "교실 2" }
   ],
-  "defaults": {
-    "firstScene": "lobby"
-  }
+  "defaults": { "firstScene": "lobby" }
 }
