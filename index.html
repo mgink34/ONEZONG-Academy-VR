@@ -164,11 +164,22 @@
   }
 
   // VR 버튼
-  document.getElementById('enterVR').onclick=async()=>{ try{ await scene.enterVR(); }catch(e){ console.warn(e); } };
+  document.getElementById('enterVR').onclick = async ()=>{
+    // 자동투어 중이면 정지
+    if (touring){ touring=false; clearTimeout(tourTimer); stopAutoRot(); }
+    // 전체화면/가로잠금 해제
+    await exitFullscreenLandscape();
+    // VR 진입
+    try{ await scene.enterVR(); }catch(e){ console.warn(e); }
+  };
 
   // VR 진입/종료
   scene.addEventListener('enter-vr', async ()=>{
-    await exitFullscreenLandscape(); // 자동투어용 전체화면 해제
+    // 자동투어 중이면 정지
+    if (touring){ touring=false; clearTimeout(tourTimer); stopAutoRot(); }
+    // 전체화면/가로잠금 해제
+    await exitFullscreenLandscape();
+
     vrCur.setAttribute('visible', true);
     const sess = scene.renderer?.xr?.getSession?.();
     const hasDom = !!sess?.domOverlayState;
