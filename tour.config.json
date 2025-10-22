@@ -2,8 +2,9 @@
   "constants": {
     "FADE_MS": 800,
     "AUTO_ROT_SPEED_TOUR": 7,
-    "YAW_MODE": "NEG",              
-    "HS_RADIUS": 10,                
+    "YAW_MODE": "NEG",
+    "HS_HIT_R": 22,              
+    "HS_VIS_R": 10,                
     "HS_SPHERE_R": 480,          
     "TARGET_PITCH_SIGN": -1,      
     "TARGET_YAW_SIGN": -1           
