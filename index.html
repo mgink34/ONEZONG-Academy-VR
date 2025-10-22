@@ -1,221 +1,174 @@
 <!doctype html>
 <html>
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.css">
-<script src="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.js"></script>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
 <style>
-  body{margin:0}
-  #p{width:100vw;height:100vh}
-  .hs{width:22px;height:22px;border-radius:50%;background:#fff8;border:2px solid #0007;box-shadow:0 0 6px #0006;cursor:pointer}
-  #coord{position:fixed;left:8px;bottom:8px;padding:6px 8px;background:#000a;color:#fff;font:12px/1.2 monospace;border-radius:4px;z-index:11}
-  #sceneLabel{position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:14;padding:6px 10px;border-radius:6px;background:#0009;color:#fff;font:30px/1.2 sans-serif}
-  #rotateHint{position:fixed;top:72px;left:50%;transform:translateX(-50%);z-index:15;padding:4px 8px;border-radius:6px;background:rgba(255,255,255,.8);color:#f00;font:18px/1.2 sans-serif}
-  #minimap.tour-hide{opacity:0;pointer-events:none;transition:opacity .2s}
-  #controls.tour-pos{position:fixed;right:8px;top:8px;z-index:16;gap:10px}
-  #controls.tour-pos button{padding:10px 14px}
-  #coord.tour-hide{opacity:0;pointer-events:none;transition:opacity .2s}
-  @media (orientation:landscape){ #rotateHint{display:none} }
-  #uiRight{position:fixed;top:8px;right:8px;z-index:12;width:260px;pointer-events:none}
-  #minimap{
-    position:relative;width:100%;aspect-ratio:10.28/12.75;border-radius:8px;
-    background:#222 center/cover no-repeat;
-    box-shadow:0 2px 10px #0006;overflow:hidden;pointer-events:auto
-  }
-  .mm-pin{position:absolute;transform:translate(-50%,-50%);width:18px;height:18px;border-radius:50%;background:#ff0c;border:2px solid #0008;box-shadow:0 0 6px #0007;cursor:pointer}
-  .mm-pin:hover{background:#ff0e}
-  .mm-label{position:absolute;transform:translate(-50%,-125%);color:#fff;background:#0009;font:12px/1.1 sans-serif;padding:2px 6px;border-radius:4px;pointer-events:none}
-  #controls{margin-top:8px;display:flex;gap:8px;justify-content:flex-end;pointer-events:auto}
-  #controls button{padding:8px 10px;border:1px solid #0003;border-radius:6px;cursor:pointer;background:#fff9}
-  #tourPlay,#tourPause{position:static}
-  @media (max-width:480px){ #uiRight{width:180px} }
+  html,body{margin:0;height:100%;background:#000}
+  #ui{position:fixed;top:8px;left:8px;right:8px;display:flex;gap:8px;z-index:10}
+  #sceneLabel{margin-right:auto;padding:6px 10px;background:#0009;color:#fff;border-radius:6px;font:16px/1.2 sans-serif}
+  #coord{padding:6px 10px;background:#0009;color:#fff;border-radius:6px;font:12px/1.2 monospace}
+  #controls{position:fixed;top:8px;right:8px;z-index:11;display:flex;gap:8px}
+  #controls button{padding:8px 10px;border-radius:6px;border:1px solid #0003;background:#fff;cursor:pointer}
 </style>
 </head>
 <body>
-<div id="p"></div>
-<div id="sceneLabel">-</div>
-<div id="rotateHint">화면을 가로로 돌려주세요</div>
-<div id="coord">pitch:-, yaw:-, hfov:-</div>
-
-<div id="uiRight">
-  <div id="minimap"></div>
-  <div id="controls">
-    <button id="tourPlay">자동투어 시작</button>
-    <button id="tourPause">자동투어 정지</button>
-  </div>
+<div id="ui">
+  <div id="sceneLabel">-</div>
+  <div id="coord">pitch:-, yaw:-, fov:-</div>
 </div>
+<div id="controls">
+  <button id="tourPlay">자동투어 시작</button>
+  <button id="tourPause">자동투어 정지</button>
+</div>
+
+<a-scene renderer="antialias:true" vr-mode-ui="enabled:true">
+  <!-- 카메라 + 커서(모바일 탭/헤드기어 응시 클릭) -->
+  <a-entity id="rig" position="0 1.6 0">
+    <a-entity id="cam" camera="fov:80" look-controls wasd-controls
+              cursor="rayOrigin: mouse"
+              raycaster="objects: .hs"></a-entity>
+  </a-entity>
+
+  <!-- 파노라마 구 -->
+  <a-sky id="sky" radius="500" rotation="0 0 0" src=""></a-sky>
+
+  <!-- 핫스팟 컨테이너 -->
+  <a-entity id="hotspots"></a-entity>
+</a-scene>
 
 <script>
 (async function(){
   const cfg = await fetch('tour.config.json', {cache:'no-cache'}).then(r=>r.json());
+  const TARGET = cfg.targets || {};
+  const sceneNames = cfg.sceneNames || {};
+  const FADE_MS = cfg.constants?.FADE_MS ?? 600;
+  const AUTO_ROT_SPEED_TOUR = cfg.constants?.AUTO_ROT_SPEED_TOUR ?? 8; // deg/s
+  const AUTO_ROT_IDLE_MS = cfg.constants?.AUTO_ROT_IDLE_MS ?? 3000;
 
-  const FADE_MS = cfg.constants.FADE_MS;
-  const AUTO_ROT_SPEED_TOUR = cfg.constants.AUTO_ROT_SPEED_TOUR;
-  const AUTO_ROT_IDLE_MS = cfg.constants.AUTO_ROT_IDLE_MS;
+  const scenes = {};
+  for (const s of cfg.scenes) scenes[s.id] = s;
 
-  const TARGET = cfg.targets;
-  const sceneNames = cfg.sceneNames;
-  const firstScene = cfg.defaults.firstScene;
+  const sky = document.getElementById('sky');
+  const hsRoot = document.getElementById('hotspots');
+  const rig = document.getElementById('rig');
+  const cam = document.getElementById('cam');
 
-  function buildPannellumConfig(){
-    const scenes = {};
-    for(const s of cfg.scenes){
-      scenes[s.id] = {
-        type: "equirectangular",
-        panorama: cfg.assets.panoramas[s.id],
-        hfov: s.hfov,
-        hotSpots: s.hotSpots.map(h=>({
-          pitch: h.pitch, yaw: h.yaw, cssClass: "hs",
-          createTooltipFunc: el => el.title = h.label,
-          clickHandlerFunc: ()=> go(h.to)
-        }))
-      };
-    }
-    return {
-      default: { firstScene, sceneFadeDuration: FADE_MS, autoLoad: true },
-      scenes
-    };
+  function setLabel(id){ document.getElementById('sceneLabel').textContent = sceneNames[id] || id; }
+  function setCoord(){
+    const rot = rig.getAttribute('rotation');
+    const fov = cam.getAttribute('camera').fov;
+    document.getElementById('coord').textContent =
+      `pitch:${(-rot.x).toFixed(1)}, yaw:${(-rot.y).toFixed(1)}, fov:${fov.toFixed(1)}`;
   }
 
-  const viewer = pannellum.viewer('p', buildPannellumConfig());
-
-  function isFS(){ return document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement; }
-  const isAndroidChrome = /Android/i.test(navigator.userAgent) && !!window.chrome;
-  const canLock = 'orientation' in screen && 'lock' in screen.orientation;
-  async function tryLockLandscape(){ if(!isAndroidChrome||!canLock) return; try{ await screen.orientation.lock('landscape'); }catch{} }
-  function tryUnlock(){ try{ screen.orientation.unlock?.(); }catch{} }
-  function onFSChange(){ if (isFS()) tryLockLandscape(); else tryUnlock(); }
-  document.addEventListener('fullscreenchange', onFSChange);
-  document.addEventListener('webkitfullscreenchange', onFSChange);
-  function enterFS(el){ return el.requestFullscreen?.() || el.webkitRequestFullscreen?.() || el.msRequestFullscreen?.(); }
-  function exitFS(){ return document.exitFullscreen?.() || document.webkitExitFullscreen?.() || document.msExitFullscreen?.(); }
-
-  function setTourUI(on){
-    document.getElementById('minimap').classList.toggle('tour-hide', on);
-    document.getElementById('controls').classList.toggle('tour-pos', on);
-    document.getElementById('coord').classList.toggle('tour-hide', on);
+  // equirect pitch/yaw(도) → 구면 좌표에 배치
+  function hotspotPos(pitchDeg, yawDeg, R=499){
+    const toRad = Math.PI/180;
+    const pitch = pitchDeg*toRad, yaw = yawDeg*toRad;
+    const x =  R * Math.cos(pitch)*Math.sin(yaw);
+    const y =  R * Math.sin(pitch);
+    const z = -R * Math.cos(pitch)*Math.cos(yaw);
+    return `${x} ${y} ${z}`;
   }
 
-  let transitioning=false;
-  function flyAndLoad(id,p,y,f){
-    if(transitioning) return;
+  function clearHotspots(){ while(hsRoot.firstChild) hsRoot.removeChild(hsRoot.firstChild); }
+  function makeHotspot(h){
+    const e = document.createElement('a-entity');
+    e.setAttribute('class','hs');
+    e.setAttribute('geometry','primitive: sphere; radius: 0.6');
+    e.setAttribute('material','color: #FFFFFF; metalness:0; roughness:0.2; emissive:#FFFFFF; emissiveIntensity:0.5');
+    e.setAttribute('position', hotspotPos(h.pitch, h.yaw));
+    e.setAttribute('look-at', '#cam');
+    e.setAttribute('title', h.label || '');
+    e.addEventListener('click', ()=> go(h.to));
+    return e;
+  }
+
+  let current="", transitioning=false, touring=false, tourIdx=0, tourTimer=null, idleTimer=null;
+
+  function setFovFromHFOV(hfov){
+    // 대략 변환: 수평→수직 FOV. 화면비 16:9 가정.
+    const aspect = 16/9;
+    const hf = (hfov??100) * Math.PI/180;
+    const vf = 2*Math.atan(Math.tan(hf/2)/aspect) * 180/Math.PI;
+    cam.setAttribute('camera', 'fov', Math.max(40, Math.min(110, vf)));
+  }
+
+  function loadScene(id, p=0, y=0, f=100){
+    if (transitioning || !scenes[id]) return;
     transitioning=true;
-    viewer.loadScene(id,p,y,f,FADE_MS);
-    setTimeout(()=>{transitioning=false},FADE_MS+50);
+    const s = scenes[id];
+    sky.emit('fadeout');
+    setTimeout(()=>{
+      sky.setAttribute('src', cfg.assets.panoramas[id]);
+      setFovFromHFOV(f || s.hfov);
+      rig.setAttribute('rotation', `${-p} ${-y} 0`);
+      clearHotspots();
+      (s.hotSpots||[]).forEach(h=> hsRoot.appendChild(makeHotspot(h)));
+      setLabel(id);
+      setCoord();
+      sky.emit('fadein');
+      current=id; transitioning=false;
+    }, FADE_MS/2);
   }
+
+  // 간단 페이드
+  AFRAME.registerComponent('fade-sky', {
+    init(){
+      this.el.setAttribute('animation__out',{
+        property:'material.color', to:'#000', startEvents:'fadeout', dur:FADE_MS/2
+      });
+      this.el.setAttribute('animation__in',{
+        property:'material.color', from:'#000', to:'#FFF', startEvents:'fadein', dur:FADE_MS/2
+      });
+    }
+  });
+  sky.setAttribute('fade-sky','');
+
   function go(id){
-    const t = TARGET[id] || {p:0,y:0,f:120};
-    flyAndLoad(id,t.p,t.y,t.f);
+    const t = TARGET[id] || {p:0,y:0,f: scenes[id]?.hfov ?? 100};
+    loadScene(id, t.p, t.y, t.f);
   }
   window.go = go;
 
-  function buildMinimap(){
-    const el = document.getElementById('minimap');
-    el.style.backgroundImage = `url("${cfg.assets.minimap}")`;
-    for(const pin of cfg.minimapPins){
-      const p = document.createElement('div');
-      p.className = 'mm-pin';
-      p.style.left = pin.left;
-      p.style.top = pin.top;
-      p.dataset.scene = pin.scene;
-      p.addEventListener('click', ()=> go(pin.scene));
-      const lab = document.createElement('div');
-      lab.className = 'mm-label';
-      lab.style.left = pin.left;
-      lab.style.top = `calc(${pin.top} - 3%)`;
-      lab.textContent = pin.label;
-      el.appendChild(p);
-      el.appendChild(lab);
-    }
-  }
-  buildMinimap();
-
-  const tourOrder = cfg.tour.order;
-  const defaultDwell = cfg.tour.dwellMs;
-  const perSceneDwell = cfg.tour.perSceneDwell || {};
-  const tourSteps = tourOrder.map(id=>({
-    scene:id,
-    ...(TARGET[id] || {p:0,y:0,f:120}),
-    dwell: perSceneDwell[id] ?? defaultDwell
-  }));
-
-  let tourIdx=0,tourTimer=null,touring=false,idleTimer=null;
-  function gotoStep(i){
-    const s=tourSteps[i%tourSteps.length];
-    const onLoad=()=>{
-      viewer.off('load',onLoad);
-      if(!touring){ try{viewer.stopAutoRotate();}catch{}; return; }
-      try{viewer.startAutoRotate(AUTO_ROT_SPEED_TOUR);}catch{}
-      updateSceneLabel();
-    };
-    viewer.on('load',onLoad);
-    viewer.loadScene(s.scene,s.p,s.y,s.f,FADE_MS);
-  }
-  function nextStep(){
-    if(!touring) return;
-    tourIdx=(tourIdx+1)%tourSteps.length;
-    gotoStep(tourIdx);
+  // 자동 투어
+  const tourOrder = cfg.tour?.order || Object.keys(scenes);
+  const defaultDwell = cfg.tour?.dwellMs ?? 3000;
+  const perSceneDwell = cfg.tour?.perSceneDwell || {};
+  function tourStep(i){
+    const id = tourOrder[i % tourOrder.length];
+    const t = TARGET[id] || {p:0,y:0,f: scenes[id]?.hfov ?? 100};
+    go(id);
     clearTimeout(tourTimer);
-    tourTimer=setTimeout(nextStep,tourSteps[tourIdx].dwell+FADE_MS);
+    tourTimer = setTimeout(()=> {
+      if(!touring) return;
+      tourIdx = (i+1)%tourOrder.length;
+      tourStep(tourIdx);
+    }, (perSceneDwell[id] ?? defaultDwell) + FADE_MS);
   }
+  document.getElementById('tourPlay').onclick = ()=>{ if(touring) return; touring=true; tourStep(tourIdx); };
+  document.getElementById('tourPause').onclick = ()=>{ touring=false; clearTimeout(tourTimer); };
 
-  document.getElementById('tourPlay').onclick = async ()=>{
-    if (touring) return;
-    if (!isFS()) { try{ await enterFS(document.documentElement); }catch(e){} }
-    touring = true;
-    setTourUI(true);
-    gotoStep(tourIdx);
-    clearTimeout(tourTimer);
-    tourTimer = setTimeout(nextStep, tourSteps[tourIdx].dwell + FADE_MS);
-  };
-
-  document.getElementById('tourPause').onclick = async ()=>{
-    touring = false;
-    clearTimeout(tourTimer);
-    try{ viewer.stopAutoRotate(); }catch{}
-    setTourUI(false);
-    try{ await exitFS(); }catch{}
-    try{ screen.orientation.unlock?.(); }catch{}
-  };
-
-  ['fullscreenchange','webkitfullscreenchange'].forEach(ev=>{
-    document.addEventListener(ev, ()=>{ if(!isFS()) setTourUI(false); });
-  });
-
+  // 유휴 시 자동 회전
+  function startAutoRot(){ rig.setAttribute('animation__yaw',`property: rotation; to: 0 -360 0; loop: true; dur:${360/Math.max(1,AUTO_ROT_SPEED_TOUR)*1000}; easing: linear`); }
+  function stopAutoRot(){ rig.removeAttribute('animation__yaw'); }
   ['mousedown','touchstart','wheel','keydown'].forEach(ev=>{
     window.addEventListener(ev,()=>{
-      if(!touring) return;
-      try{viewer.stopAutoRotate()}catch{}
+      stopAutoRot();
       clearTimeout(idleTimer);
-      idleTimer=setTimeout(()=>{
-        if(touring){ try{viewer.startAutoRotate(AUTO_ROT_SPEED_TOUR)}catch{} }
-      },AUTO_ROT_IDLE_MS);
+      idleTimer=setTimeout(()=>{ if(!touring) startAutoRot(); }, AUTO_ROT_IDLE_MS);
     },{passive:true});
   });
 
-  function resume(){
-    setTimeout(()=>{
-      if(touring){ try{viewer.startAutoRotate(AUTO_ROT_SPEED_TOUR)}catch{} }
-      updateSceneLabel();
-    },80);
-  }
-  ['fullscreenchange','webkitfullscreenchange','msfullscreenchange'].forEach(ev=>document.addEventListener(ev,resume));
-  window.addEventListener('resize',resume);
-  window.addEventListener('orientationchange',resume);
+  // 초기화
+  const first = cfg.defaults?.firstScene || Object.keys(scenes)[0];
+  go(first);
+  startAutoRot();
 
-  function updateSceneLabel(){
-    const id=viewer.getScene();
-    document.getElementById('sceneLabel').textContent = sceneNames[id] || id || '-';
-  }
-  viewer.on('load',updateSceneLabel);
-  updateSceneLabel();
-
-  function updateHUD(){
-    const a=viewer.getPitch().toFixed(2), b=viewer.getYaw().toFixed(2), c=viewer.getHfov().toFixed(2);
-    document.getElementById('coord').textContent=`pitch:${a}, yaw:${b}, hfov:${c}`;
-  }
-  ['mouseup','touchend','wheel','keydown'].forEach(ev=>window.addEventListener(ev,updateHUD));
+  // 좌표 표시 업데이트
+  setInterval(setCoord, 250);
 })();
 </script>
 </body>
