@@ -23,11 +23,15 @@
   .mm-label{position:absolute;transform:translate(-50%,-125%);color:#fff;background:#0009;font:12px/1.1 sans-serif;padding:2px 6px;border-radius:4px;pointer-events:none}
   .hs{pointer-events:auto}
   @media (orientation:portrait){ a-scene{width:100vw;height:100vh;max-width:100vw;aspect-ratio:auto} }
+
+  /* 전체화면 대체 레이아웃 (iOS 등) */
+  body.fs-like{position:fixed;inset:0;width:100vw;height:100vh;overflow:hidden;background:#000}
+  body.fs-like a-scene{width:100vw;height:100vh;max-width:100vw;aspect-ratio:auto}
 </style>
 </head>
 <body>
 
-<!-- DOM Overlay: VR에서도 동일 위치 -->
+<!-- DOM Overlay -->
 <div id="hud">
   <div id="sceneLabel">-</div>
   <div id="coord">pitch:-, yaw:-, fov:-</div>
@@ -43,7 +47,7 @@
 <a-scene id="scene"
   renderer="antialias:true; colorManagement:true"
   vr-mode-ui="enabled:true"
-  webxr="requiredFeatures: dom-overlay; overlayElement: #hud">
+  webxr="optionalFeatures: dom-overlay; overlayElement: #hud">
 
   <a-entity id="rig" position="0 1.6 0">
     <a-entity id="cam"
@@ -61,7 +65,7 @@
         raycaster="objects: .hs, .hs *; recursive: true; far: 2000">
       </a-entity>
 
-      <!-- 3D 폴백 라벨: dom-overlay 미지원 시 사용 -->
+      <!-- DOM 오버레이 미지원 시 사용할 3D 라벨 -->
       <a-entity id="vrLabel3D" visible="false" position="-0.45 0.32 -0.7">
         <a-plane id="vrLabelPlane" width="0.9" height="0.2"
                  material="color:#000; opacity:0.7; shader:flat; transparent:true; side:double; depthTest:false"></a-plane>
@@ -79,7 +83,6 @@
 
 <script>
 (async function(){
-  // JSON 캐시 무효화
   const cfg = await fetch(`tour.config.json?ts=${Date.now()}`,{cache:'no-cache'}).then(r=>r.json());
 
   // === 상수 ===
@@ -107,7 +110,7 @@
   const vrLabelText=document.getElementById('vrLabelText');
   const vrLabelPlane=document.getElementById('vrLabelPlane');
 
-  // JSON HUD 적용 함수
+  // JSON HUD 적용
   function applyHUDFromJSON(){
     const HUD = cfg.hud?.label3D || {};
     const pos = HUD.position || [-0.45, 0.32, -0.70];
@@ -115,28 +118,24 @@
     const text  = HUD.text  || {};
 
     vrLabel3D.setAttribute('position', pos.join(' '));
-
     if (plane.width)  vrLabelPlane.setAttribute('width',  plane.width);
     if (plane.height) vrLabelPlane.setAttribute('height', plane.height);
     if (plane.opacity!=null){
       vrLabelPlane.setAttribute('material',
         `color:#000; opacity:${plane.opacity}; shader:flat; transparent:true; side:double; depthTest:false`);
     }
-
     if (text.fontSize) vrLabelText.setAttribute('font-size', text.fontSize);
     if (text.maxWidth) vrLabelText.setAttribute('max-width', text.maxWidth);
     if (text.color)    vrLabelText.setAttribute('color', text.color);
     if (text.font)     vrLabelText.setAttribute('font', text.font);
   }
-
-  // 씬/컴포넌트 로드 이후에 적용
-  scene.addEventListener('loaded', ()=>{ applyHUDFromJSON(); });
+  scene.addEventListener('loaded', applyHUDFromJSON);
   setTimeout(applyHUDFromJSON, 0);
 
   function setLabel(id){
     const name = sceneNames[id] || id || '-';
-    document.getElementById('sceneLabel').textContent = name;   // DOM
-    vrLabelText.setAttribute('value', name);                    // 3D 폴백
+    document.getElementById('sceneLabel').textContent = name;
+    vrLabelText.setAttribute('value', name);
     requestAnimationFrame(()=> vrLabelText.setAttribute('value', name));
   }
   function setCoord(){
@@ -147,15 +146,34 @@
   }
   setInterval(setCoord,250);
 
+  // 전체화면+가로 고정 유틸
+  async function enterFullscreenLandscape(){
+    const root=document.documentElement;
+    try{
+      if(!document.fullscreenElement && root.requestFullscreen){
+        await root.requestFullscreen({navigationUI:'hide'}).catch(()=>{});
+      }
+    }catch(_){}
+    try{ await screen.orientation?.lock?.('landscape'); }catch(_){}
+    if(!document.fullscreenElement) document.body.classList.add('fs-like');
+  }
+  async function exitFullscreenLandscape(){
+    document.body.classList.remove('fs-like');
+    try{ if(document.fullscreenElement) await document.exitFullscreen(); }catch(_){}
+    try{ screen.orientation?.unlock?.(); }catch(_){}
+  }
+
+  // VR 버튼
   document.getElementById('enterVR').onclick=async()=>{ try{ await scene.enterVR(); }catch(e){ console.warn(e); } };
 
-  scene.addEventListener('enter-vr', ()=>{
+  // VR 진입/종료
+  scene.addEventListener('enter-vr', async ()=>{
+    await exitFullscreenLandscape(); // 자동투어용 전체화면 해제
     vrCur.setAttribute('visible', true);
     const sess = scene.renderer?.xr?.getSession?.();
     const hasDom = !!sess?.domOverlayState;
     vrLabel3D.setAttribute('visible', !hasDom);
     if (!hasDom){
-      // 가독성 보정 + 최상위 렌더
       vrLabel3D.object3D.traverse(o=>{
         if (o.material){ o.material.depthTest=false; o.material.depthWrite=false; if('toneMapped' in o.material) o.material.toneMapped=false; o.material.needsUpdate=true; }
         o.renderOrder=10000;
@@ -251,8 +269,10 @@
     rig.object3D.rotation.set(0,0,0);
   }
 
-  // 로딩/이동
+  // 상태
   let transitioning=false, touring=false, tourIdx=0, tourTimer=null;
+
+  // 로딩/이동
   function loadScene(id,p=0,y=0,f=100){
     if(transitioning) return;
     if(!scenes[id]){ console.warn('unknown scene id:',id); return; }
@@ -288,8 +308,21 @@
     clearTimeout(tourTimer);
     tourTimer=setTimeout(()=>{ if(touring) tourStep((i+1)%tourOrder.length); },(perSceneDwell[id]??defaultDwell)+FADE_MS);
   }
-  document.getElementById('tourPlay').onclick=()=>{ if(touring) return; touring=true; startAutoRot(); tourStep(tourIdx); };
-  document.getElementById('tourPause').onclick=()=>{ touring=false; clearTimeout(tourTimer); stopAutoRot(); };
+
+  // 버튼
+  document.getElementById('tourPlay').onclick = async ()=>{
+    if (touring) return;
+    await enterFullscreenLandscape();   // 자동투어 시작 시 전체화면+가로
+    touring = true;
+    startAutoRot();
+    tourStep(tourIdx);
+  };
+  document.getElementById('tourPause').onclick = async ()=>{
+    touring = false;
+    clearTimeout(tourTimer);
+    stopAutoRot();
+    await exitFullscreenLandscape();    // 자동투어 정지 시 해제
+  };
 
   // 줌
   const FOV_MIN=35, FOV_MAX=110, FOV_STEP=3;
