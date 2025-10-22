@@ -2,10 +2,11 @@
   "constants": {
     "FADE_MS": 800,
     "AUTO_ROT_SPEED_TOUR": 7,
-    "AUTO_ROT_IDLE_MS": 3000,
-    "YAW_MODE": "NEG",
-    "HS_RADIUS": 10,
-    "HS_SPHERE_R": 480
+    "YAW_MODE": "NEG",              
+    "HS_RADIUS": 10,                
+    "HS_SPHERE_R": 480,          
+    "TARGET_PITCH_SIGN": -1,      
+    "TARGET_YAW_SIGN": -1           
   },
   "assets": {
     "minimap": "TOP.png",
@@ -26,10 +27,10 @@
   },
   "targets": {
     "lobby":      { "p": 0,    "y": 0,      "f": 110 },
-    "kitchen":    { "p": 0,    "y": 0,      "f": 110 },
-    "hall":       { "p": 0,    "y": 180,    "f": 110 },
-    "classroom1": { "p": -1.48,"y": 177.48, "f": 110 },
-    "classroom2": { "p": 0,    "y": 0,      "f": 110 }
+    "kitchen":    { "p": 0,    "y": 90,      "f": 110 },
+    "hall":       { "p": 0,    "y": -90,    "f": 110 },
+    "classroom1": { "p": -10,    "y": -22, "f": 110   },
+    "classroom2": { "p": 0,    "y": 90,      "f": 110 }
   },
   "scenes": [
     {

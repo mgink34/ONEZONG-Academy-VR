@@ -33,12 +33,34 @@
 <div id="uiRight"><div id="minimap"></div></div>
 
 <a-scene id="scene" renderer="antialias:true; colorManagement:true" vr-mode-ui="enabled:true">
-  <a-entity id="rig" position="0 1.6 0" look-controls>
+  <a-entity id="rig" position="0 1.6 0">
+    <!-- 데스크탑: 마우스, VR: 시선커서/컨트롤러 모두 지원 -->
     <a-entity id="cam"
       camera="fov:80"
+      look-controls
       cursor="rayOrigin: mouse"
       raycaster="objects: .hs; recursive: true; useWorldCoordinates: true; far: 2000; interval: 0">
+
+      <!-- VR 시선 커서(fuse). VR 진입 시 visible=true로 전환 -->
+      <a-entity id="vrCursor"
+        position="0 0 -1"
+        geometry="primitive:ring; radiusInner:0.01; radiusOuter:0.015"
+        material="color:#fff; shader:flat; opacity:0.9"
+        visible="false"
+        cursor="rayOrigin: entity; fuse: true; fuseTimeout: 700"
+        raycaster="objects: .hs">
+      </a-entity>
     </a-entity>
+  </a-entity>
+
+  <!-- VR 컨트롤러: 레이저로 .hs 타겟팅 -->
+  <a-entity id="rhand"
+    laser-controls="hand: right"
+    raycaster="objects: .hs; showLine: true; lineColor: white; far: 2000">
+  </a-entity>
+  <a-entity id="lhand"
+    laser-controls="hand: left"
+    raycaster="objects: .hs; showLine: true; lineColor: white; far: 2000">
   </a-entity>
 
   <a-sky id="sky" radius="500" rotation="0 0 0" src=""></a-sky>
@@ -49,40 +71,52 @@
 (async function(){
   const cfg = await fetch('tour.config.json',{cache:'no-cache'}).then(r=>r.json());
 
-  // 파라미터(부호 유지)
-  const YAW_MODE     = cfg.constants?.YAW_MODE     || "NEG";   // "NEG" 또는 "NEG_180"
-  const HS_RADIUS    = cfg.constants?.HS_RADIUS    ?? 6;       // 핫스팟 크기
-  const HS_SPHERE_R  = cfg.constants?.HS_SPHERE_R  ?? 480;     // 배치 반경
-
-  const TARGET = cfg.targets || {};
-  const sceneNames = cfg.sceneNames || {};
-  const FADE_MS = cfg.constants?.FADE_MS ?? 600;
+  // === 상수 ===
+  const YAW_MODE            = cfg.constants?.YAW_MODE            || "NEG";
+  const HS_RADIUS           = cfg.constants?.HS_RADIUS           ?? 10;
+  const HS_SPHERE_R         = cfg.constants?.HS_SPHERE_R         ?? 480;
+  const TARGET_PITCH_SIGN   = cfg.constants?.TARGET_PITCH_SIGN   ?? 1;
+  const TARGET_YAW_SIGN     = cfg.constants?.TARGET_YAW_SIGN     ?? 1;
+  const FADE_MS             = cfg.constants?.FADE_MS             ?? 600;
   const AUTO_ROT_SPEED_TOUR = cfg.constants?.AUTO_ROT_SPEED_TOUR ?? 8;
-  const AUTO_ROT_IDLE_MS = cfg.constants?.AUTO_ROT_IDLE_MS ?? 3000;
 
-  const scenes = {};
+  const TARGET     = cfg.targets    || {};
+  const sceneNames = cfg.sceneNames || {};
+  const scenes     = {};
   (cfg.scenes||[]).forEach(s=> scenes[s.id]=s);
 
-  const sky = document.getElementById('sky');
-  const hsRoot = document.getElementById('hotspots');
-  const rig = document.getElementById('rig');
-  const cam = document.getElementById('cam');
+  const scene = document.getElementById('scene');
+  const sky   = document.getElementById('sky');
+  const hsRoot= document.getElementById('hotspots');
+  const rig   = document.getElementById('rig');
+  const cam   = document.getElementById('cam');
+  const vrCur = document.getElementById('vrCursor');
 
   function setLabel(id){ document.getElementById('sceneLabel').textContent = sceneNames[id] || id || '-'; }
   function setCoord(){
-    const rot = rig.getAttribute('rotation');
+    const rot = cam.getAttribute('rotation');
     const fov = cam.getAttribute('camera').fov;
-
-    // yaw 정규화(부호는 현재 방식 유지)
-    let yaw = -rot.y;
-    yaw = yaw % 360;
-    if (yaw > 180) yaw -= 360;
-    if (yaw < -180) yaw += 360;
-
-    document.getElementById('coord').textContent =
-      `pitch:${(rot.x).toFixed(1)}, yaw:${yaw.toFixed(1)}, fov:${fov.toFixed(1)}`;
+    let yaw = rot.y; yaw = yaw % 360; if (yaw > 180) yaw -= 360; if (yaw < -180) yaw += 360;
+    document.getElementById('coord').textContent = `pitch:${(rot.x).toFixed(1)}, yaw:${yaw.toFixed(1)}, fov:${fov.toFixed(1)}`;
   }
   setInterval(setCoord, 250);
+
+  // VR 모드 진입/종료 시 시선 커서 표시/숨김
+  scene.addEventListener('enter-vr', ()=>{ vrCur.setAttribute('visible', true); });
+  scene.addEventListener('exit-vr',  ()=>{ vrCur.setAttribute('visible', false); });
+
+  // VR 컨트롤러 트리거 → .hs 클릭 이벤트 전달
+  function bindController(id){
+    const ctrl = document.getElementById(id);
+    if(!ctrl) return;
+    ctrl.addEventListener('triggerdown', ()=>{
+      const rc = ctrl.components.raycaster;
+      if(!rc || !rc.intersections?.length) return;
+      const hit = rc.intersections.find(i => i.object?.el?.classList?.contains('hs'));
+      if(hit && hit.object?.el){ hit.object.el.emit('click'); }
+    });
+  }
+  bindController('rhand'); bindController('lhand');
 
   // 미니맵
   (function buildMinimap(){
@@ -97,7 +131,7 @@
     }
   })();
 
-  // 좌표 변환(부호 유지)
+  // 핫스팟 좌표 변환
   function yawConv(y){ return (YAW_MODE==="NEG") ? y : (180 - y); }
   function hotspotPos(pitchDeg, yawDeg, R=HS_SPHERE_R){
     const t=Math.PI/180, p=pitchDeg*t, y=yawConv(yawDeg)*t;
@@ -114,14 +148,13 @@
     e.object3D.renderOrder = 999;
     e.setAttribute('position', hotspotPos(h.pitch, h.yaw));
     e.setAttribute('look-at','#cam');
-
     const goNow = ()=> go(h.to);
     e.addEventListener('click', goNow);
     e.addEventListener('touchstart', goNow, {passive:true});
     return e;
   }
 
-  // HFOV→VFOV(캔버스 null 가드)
+  // HFOV→VFOV
   function setFovFromHFOV(hfov){
     const sceneEl = document.querySelector('a-scene');
     const cw = sceneEl.canvas?.clientWidth || window.innerWidth;
@@ -132,6 +165,7 @@
     cam.setAttribute('camera','fov', Math.max(40, Math.min(110, vf)));
   }
 
+  // 페이드
   AFRAME.registerComponent('fade-sky',{
     init(){
       this.el.setAttribute('animation__out',{property:'material.color',to:'#000',startEvents:'fadeout',dur:FADE_MS/2});
@@ -140,7 +174,28 @@
   });
   sky.setAttribute('fade-sky','');
 
-  let transitioning=false, touring=false, tourIdx=0, tourTimer=null, idleTimer=null;
+  // 투어 전용 자동회전
+  function startAutoRot(){
+    rig.setAttribute('animation__yaw',
+      `property: rotation; to: 0 -360 0; loop: true; dur:${360/Math.max(1,AUTO_ROT_SPEED_TOUR)*1000}; easing: linear`);
+  }
+  function stopAutoRot(){ rig.removeAttribute('animation__yaw'); }
+
+  // 시점 강제 세팅
+  function setView(p,y){
+    const r = Math.PI/180;
+    const lc = cam.components['look-controls'];
+    const P = p, Y = y;
+    if (lc && lc.yawObject && lc.pitchObject) {
+      lc.yawObject.rotation.set(0, (-Y)*r, 0);
+      lc.pitchObject.rotation.x = (-P)*r;
+    }
+    cam.object3D.rotation.set((-P)*r, (-Y)*r, 0);
+    rig.object3D.rotation.set(0,0,0);
+  }
+
+  // 상태
+  let transitioning=false, touring=false, tourIdx=0, tourTimer=null;
 
   function loadScene(id,p=0,y=0,f=100){
     if(transitioning) return;
@@ -151,12 +206,7 @@
     setTimeout(()=>{
       sky.setAttribute('src', cfg.assets.panoramas[id]);
       setFovFromHFOV(f || scenes[id].hfov);
-
-      // 회전 적용 + look-controls 갱신
-      rig.setAttribute('rotation', `${-p} ${-y} 0`);
-      rig.setAttribute('look-controls','enabled', false);
-      rig.setAttribute('look-controls','enabled', true);
-
+      setView(p, y);
       clearHotspots();
       (scenes[id].hotSpots||[]).forEach(h=> hsRoot.appendChild(makeHotspot(h)));
       setLabel(id); setCoord();
@@ -167,44 +217,45 @@
 
   function go(id){
     const t = TARGET[id] || {p:0,y:0,f: scenes[id]?.hfov ?? 100};
-    loadScene(id, t.p, t.y, t.f);
+    loadScene(id, t.p*TARGET_PITCH_SIGN, t.y*TARGET_YAW_SIGN, t.f);
   }
   window.go=go;
 
-  // 자동 투어
+  // 자동 투어(재생 중에만 회전)
   const tourOrder = cfg.tour?.order || Object.keys(scenes);
   const defaultDwell = cfg.tour?.dwellMs ?? 3000;
   const perSceneDwell = cfg.tour?.perSceneDwell || {};
   function tourStep(i){
     if(!touring) return;
-    const id = tourOrder[i%tourOrder.length];
-    const t = TARGET[id] || {p:0,y:0,f: scenes[id]?.hfov ?? 100};
+    const id = tourOrder[i % tourOrder.length];
     go(id);
     clearTimeout(tourTimer);
-    tourTimer=setTimeout(()=>{ if(touring) tourStep((i+1)%tourOrder.length); },
-                          (perSceneDwell[id] ?? defaultDwell) + FADE_MS);
+    tourTimer = setTimeout(()=>{ if(touring) tourStep((i+1)%tourOrder.length); },
+                            (perSceneDwell[id] ?? defaultDwell) + FADE_MS);
   }
-  document.getElementById('tourPlay').onclick=()=>{ if(touring) return; touring=true; tourStep(tourIdx); };
-  document.getElementById('tourPause').onclick=()=>{ touring=false; clearTimeout(tourTimer); stopAutoRot(); };
 
-  // 유휴 자동 회전
-  function startAutoRot(){
-    rig.setAttribute('animation__yaw',
-      `property: rotation; to: 0 -360 0; loop: true; dur:${360/Math.max(1,AUTO_ROT_SPEED_TOUR)*1000}; easing: linear`);
-  }
-  function stopAutoRot(){ rig.removeAttribute('animation__yaw'); }
-  ['mousedown','touchstart','wheel','keydown'].forEach(ev=>{
-    window.addEventListener(ev,()=>{ stopAutoRot(); clearTimeout(idleTimer);
-      idleTimer=setTimeout(()=>{ if(!touring) startAutoRot(); }, AUTO_ROT_IDLE_MS); },{passive:true});
-  });
+  document.getElementById('tourPlay').onclick = ()=>{
+    if (touring) return;
+    touring = true;
+    startAutoRot();
+    tourStep(tourIdx);
+  };
+  document.getElementById('tourPause').onclick = ()=>{
+    touring = false;
+    clearTimeout(tourTimer);
+    stopAutoRot();
+  };
 
   // 확대/축소(일반 화면·모바일 전용)
-  const FOV_MIN=35, FOV_MAX=110, FOV_STEP=3;
-  const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
-  const setFov=v=>cam.setAttribute('camera','fov',clamp(v,FOV_MIN,FOV_MAX));
-  const getFov=()=>cam.getAttribute('camera').fov;
-  window.addEventListener('wheel', e=>{ setFov(getFov()+Math.sign(e.deltaY)*FOV_STEP); }, {passive:true});
-  let pinch0=null;
+  const FOV_MIN = 35, FOV_MAX = 110, FOV_STEP = 3;
+  const clamp = (v,min,max)=> Math.max(min, Math.min(max, v));
+  const setFov = v => cam.setAttribute('camera','fov', clamp(v, FOV_MIN, FOV_MAX));
+  const getFov = () => cam.getAttribute('camera').fov;
+  window.addEventListener('wheel', e=>{
+    const dir = Math.sign(e.deltaY);
+    setFov(getFov() + dir * FOV_STEP);
+  }, {passive:true});
+  let pinch0 = null;
   window.addEventListener('touchstart', e=>{
     if(e.touches.length===2){
       const dx=e.touches[0].clientX-e.touches[1].clientX;
@@ -218,7 +269,7 @@
       const dy=e.touches[0].clientY-e.touches[1].clientY;
       const d=Math.hypot(dx,dy);
       const k=(pinch0-d)/80;
-      setFov(getFov()+k*FOV_STEP);
+      setFov(getFov() + k*FOV_STEP);
       pinch0=d;
     }
   },{passive:true});
@@ -226,7 +277,8 @@
 
   // 시작
   const first = cfg.defaults?.firstScene || Object.keys(scenes)[0];
-  loadScene(first);
+  const t0 = TARGET[first] || {p:0,y:0,f: scenes[first]?.hfov ?? 100};
+  loadScene(first, t0.p*TARGET_PITCH_SIGN, t0.y*TARGET_YAW_SIGN, t0.f);
 })();
 </script>
 </body>
