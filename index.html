@@ -27,6 +27,9 @@
   /* 전체화면 대체 레이아웃 (iOS 등) */
   body.fs-like{position:fixed;inset:0;width:100vw;height:100vh;overflow:hidden;background:#000}
   body.fs-like a-scene{width:100vw;height:100vh;max-width:100vw;aspect-ratio:auto}
+
+  /* 투어 중 + VR 중일 때 미니맵 숨김 */
+  body.touring #uiRight, body.in-vr #uiRight{display:none}
 </style>
 </head>
 <body>
@@ -110,6 +113,10 @@
   const vrLabelText=document.getElementById('vrLabelText');
   const vrLabelPlane=document.getElementById('vrLabelPlane');
 
+  function clearVRFlags(){
+    document.body.classList.remove('in-vr');
+  }
+
   // JSON HUD 적용
   function applyHUDFromJSON(){
     const HUD = cfg.hud?.label3D || {};
@@ -165,23 +172,31 @@
 
   // VR 버튼
   document.getElementById('enterVR').onclick = async ()=>{
-    // 자동투어 중이면 정지
     if (touring){ touring=false; clearTimeout(tourTimer); stopAutoRot(); }
-    // 전체화면/가로잠금 해제
+    document.body.classList.remove('touring');
     await exitFullscreenLandscape();
-    // VR 진입
     try{ await scene.enterVR(); }catch(e){ console.warn(e); }
   };
 
+  // ESC로 전체화면만 종료되는 케이스 처리
+  document.addEventListener('fullscreenchange', ()=>{
+    if (!document.fullscreenElement){
+      if (touring){ touring=false; clearTimeout(tourTimer); stopAutoRot(); }
+      document.body.classList.remove('touring');
+    }
+  });
+
   // VR 진입/종료
   scene.addEventListener('enter-vr', async ()=>{
-    // 자동투어 중이면 정지
+    document.body.classList.add('in-vr');
+
+    const sess = scene.renderer?.xr?.getSession?.();
+    if (sess) sess.addEventListener('end', clearVRFlags); // 세션 종료 훅
+
     if (touring){ touring=false; clearTimeout(tourTimer); stopAutoRot(); }
-    // 전체화면/가로잠금 해제
     await exitFullscreenLandscape();
 
     vrCur.setAttribute('visible', true);
-    const sess = scene.renderer?.xr?.getSession?.();
     const hasDom = !!sess?.domOverlayState;
     vrLabel3D.setAttribute('visible', !hasDom);
     if (!hasDom){
@@ -193,6 +208,7 @@
     }
   });
   scene.addEventListener('exit-vr', ()=>{
+    clearVRFlags();
     vrCur.setAttribute('visible', false);
     vrLabel3D.setAttribute('visible', false);
   });
@@ -323,6 +339,7 @@
   // 버튼
   document.getElementById('tourPlay').onclick = async ()=>{
     if (touring) return;
+    document.body.classList.add('touring');
     await enterFullscreenLandscape();   // 자동투어 시작 시 전체화면+가로
     touring = true;
     startAutoRot();
@@ -332,6 +349,7 @@
     touring = false;
     clearTimeout(tourTimer);
     stopAutoRot();
+    document.body.classList.remove('touring');
     await exitFullscreenLandscape();    // 자동투어 정지 시 해제
   };
 
