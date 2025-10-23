@@ -50,7 +50,7 @@
 <a-scene id="scene"
   renderer="antialias:true; colorManagement:true"
   vr-mode-ui="enabled:true"
-  webxr="optionalFeatures: dom-overlay; overlayElement: #hud">
+  webxr="optionalFeatures: ;">
 
   <a-entity id="rig" position="0 1.6 0">
     <a-entity id="cam"
@@ -191,24 +191,24 @@
     document.body.classList.add('in-vr');
 
     const sess = scene.renderer?.xr?.getSession?.();
-    if (sess) sess.addEventListener('end', clearVRFlags); // 세션 종료 훅
+    if (sess) sess.addEventListener('end', ()=> document.body.classList.remove('in-vr'));
 
     if (touring){ touring=false; clearTimeout(tourTimer); stopAutoRot(); }
     await exitFullscreenLandscape();
 
-    vrCur.setAttribute('visible', true);
-    const hasDom = !!sess?.domOverlayState;
-    vrLabel3D.setAttribute('visible', !hasDom);
-    if (!hasDom){
-      vrLabel3D.object3D.traverse(o=>{
-        if (o.material){ o.material.depthTest=false; o.material.depthWrite=false; if('toneMapped' in o.material) o.material.toneMapped=false; o.material.needsUpdate=true; }
-        o.renderOrder=10000;
-      });
-      vrLabelText.setAttribute('value', document.getElementById('sceneLabel').textContent || '-');
-    }
+    vrLabel3D.setAttribute('visible', true);
+    vrLabel3D.object3D.traverse(o=>{
+      if (o.material){
+        o.material.depthTest=false; o.material.depthWrite=false;
+        if('toneMapped' in o.material) o.material.toneMapped=false;
+        o.material.needsUpdate=true;
+      }
+      o.renderOrder=10000;
+    });
+    vrLabelText.setAttribute('value', document.getElementById('sceneLabel').textContent || '-');
   });
   scene.addEventListener('exit-vr', ()=>{
-    clearVRFlags();
+    document.body.classList.remove('in-vr');
     vrCur.setAttribute('visible', false);
     vrLabel3D.setAttribute('visible', false);
   });
