@@ -197,6 +197,7 @@
     await exitFullscreenLandscape();
 
     vrLabel3D.setAttribute('visible', true);
+    vrCur.setAttribute('visible', true);   // ← 이 줄 추가
     vrLabel3D.object3D.traverse(o=>{
       if (o.material){
         o.material.depthTest=false; o.material.depthWrite=false;
